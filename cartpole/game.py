@@ -3,6 +3,7 @@ import gym
 from statistics import mean
 
 from cartpole.agent import Agent
+from cartpole.replay_agent import ReplayAgent
 from cartpole.plot import plot_averages
 
 GYM_ID = "CartPole-v0"
@@ -38,9 +39,13 @@ def play_episode(agent: Agent):
     state = torch.tensor(env.reset(), dtype=torch.float32)
     while not done:
         action = agent.act(state)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, _ = env.step(action.item())
 
-        next_state = torch.tensor(next_state, dtype=torch.float32)
+        reward = torch.tensor([reward], dtype=torch.float32)
+        if done:
+            next_state = None
+        else:
+            next_state = torch.tensor(next_state, dtype=torch.float32)
 
         agent.learn(state, action, reward, next_state, done)
 

@@ -1,5 +1,5 @@
 import torch
-from torch.nn.modules import Module, Linear, SmoothL1Loss
+from torch.nn.modules import Module, Linear, MSELoss
 from torch.optim import Adam
 import torch.nn.functional as fn
 import gym
@@ -28,7 +28,7 @@ class Agent(Module):
         self.hidden_layer = Linear(128, 64)
         self.out_layer = Linear(64, action_space)
 
-        self.loss_fn = SmoothL1Loss()
+        self.loss_fn = MSELoss()
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
 
     def override_hyper_params(self, hyper_params: dict):
@@ -44,23 +44,24 @@ class Agent(Module):
 
     def act(self, state):
         if torch.rand(1) > self.epsilon:
-            action = torch.argmax(self(state)).item()
+            action = self(state).max(0)[1].view(1, 1)
         else:
-            action = random.randint(0, self.action_space - 1)
+            action = torch.tensor([[random.randrange(self.action_space)]])
         self.reduce_epsilon()
         return action
 
     def learn(self, state, action, reward, next_state, done):
         q_current = self(state)[action]
-        q_next = torch.max(self(next_state))
 
         if done:
             q_target = torch.tensor(reward)
-            q_target.requires_grad_()
         else:
-            q_target = reward + (self.gamma * q_next)
+            q_next = torch.max(self(next_state))
+            q_target = torch.tensor(reward + (self.gamma * q_next))
 
+        q_target = q_target.unsqueeze(1)
         q_target.requires_grad_()
+
         loss = self.loss_fn(q_current, q_target)
         self.optimizer.zero_grad()
         loss.backward()
